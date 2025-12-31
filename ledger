@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caravan Trade HUD (Wide)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    html, body { margin:0; padding:0; background:transparent; overflow:visible; }
+    body{ padding-top: 0; }
+
+    :root{
+      --a: 1;
+
+      --ink: rgba(26, 18, 10, 0.92);
+      --inkSoft: rgba(26, 18, 10, 0.66);
+
+      --good: rgba(20, 118, 62, 0.95);
+      --bad: rgba(165, 40, 34, 0.95);
+
+      --wax1: rgba(146, 34, 26, 0.92);
+      --wax2: rgba(112, 18, 14, 0.92);
+      --wax3: rgba(78, 10, 8, 0.85);
+      --gold: rgba(200, 168, 92, 0.90);
+    }
+
+    .stage{ display:inline-block; padding: 34px; }
+
+    .hud{
+      width: 980px;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--ink);
+    }
+
+    .board{
+      position: relative;
+      border-radius: 16px;
+      border: 1px solid rgba(78,54,26, calc(0.35 * var(--a)));
+      box-shadow:
+        0 18px 66px rgba(0,0,0, calc(0.38 * var(--a))),
+        inset 0 0 0 1px rgba(255,255,255, calc(0.20 * var(--a)));
+      overflow: hidden;
+
+      background:
+        radial-gradient(340px 150px at 15% 18%, rgba(255,255,255, calc(0.26 * var(--a))), transparent 62%),
+        radial-gradient(520px 260px at 88% 80%, rgba(0,0,0, calc(0.10 * var(--a))), transparent 72%),
+        repeating-linear-gradient(25deg,
+          rgba(0,0,0, calc(0.03 * var(--a))) 0px,
+          rgba(0,0,0, calc(0.03 * var(--a))) 1px,
+          rgba(255,255,255, 0) 12px,
+          rgba(255,255,255, 0) 20px
+        ),
+        linear-gradient(180deg,
+          rgba(238, 224, 196, calc(0.94 * var(--a))),
+          rgba(222, 199, 158, calc(0.88 * var(--a)))
+        );
+    }
+
+    .wrap{ padding: 10px 14px 12px; }
+
+    /* Keep the logo ONLY in the header area so it never overlaps tables */
+    .topStrip{
+      position: relative;
+      padding: 10px 12px 10px 12px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.35 * var(--a)));
+      margin: 0 2px 10px 2px;
+      border-radius: 12px;
+      background: rgba(255,255,255, calc(0.10 * var(--a)));
+      overflow: hidden;
+    }
+    .topStrip::after{
+      content:"";
+      position:absolute;
+      inset: 0;
+      background-image: url("https://i.vgy.me/sZaeym.png");
+      background-repeat: no-repeat;
+      background-size: 170px auto;
+      background-position: 14px 10px;
+      opacity: calc(0.18 * var(--a));
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+      mix-blend-mode: multiply;
+      pointer-events:none;
+      user-select:none;
+    }
+
+/* Bottom-right brand watermark (both slides) */
+.board::before{
+  content:"";
+  position:absolute;
+  right: 18px;
+  bottom: 6px;
+  width: 240px;
+  height: 140px;
+  background-image: url("https://i.vgy.me/sZaeym.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: right bottom;
+  opacity: calc(0.14 * var(--a));
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.18));
+  mix-blend-mode: multiply;
+  pointer-events:none;
+  user-select:none;
+  z-index: 0;
+}
+
+    .header{
+      position: relative;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+      z-index: 1; /* above watermark */
+    }
+
+    .title{
+      font-family: "IM Fell English", serif;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+      line-height: 1;
+      padding-left: 182px; /* clears the logo */
+      text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+    }
+
+    .metaRight{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .stampTime{
+      font-size: 10px;
+      color: var(--inkSoft);
+      white-space: nowrap;
+    }
+
+    .live{
+      font-size: 10px;
+      color: rgba(25, 18, 10, 0.60);
+      display:flex;
+      align-items:center;
+      gap:6px;
+      user-select:none;
+      white-space: nowrap;
+    }
+    .dot{
+      width:6px; height:6px; border-radius:50%;
+      background: rgba(110,40,30, calc(0.65 * var(--a)));
+      opacity: 1;
+    }
+
+    /* Layout: left panel + right totals (Totals slide). Stock slide collapses totals. */
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 340px;
+      gap: 10px;
+      align-items: start;
+      transition: grid-template-columns 220ms ease;
+    }
+    .grid.stockMode{
+      grid-template-columns: 1fr 0px;
+      gap: 0;
+    }
+    .grid.stockMode .stats{ display:none; }
+
+    /* LEFT PANEL */
+    .panel{
+      border-radius: 12px;
+      background: rgba(255,255,255, calc(0.24 * var(--a)));
+      border: 1px solid rgba(78,54,26, calc(0.16 * var(--a)));
+      padding: 10px;
+      min-height: 230px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panelTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.22 * var(--a)));
+    }
+    .panelTitle h3{
+      margin:0;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: rgba(45, 30, 16, 0.70);
+    }
+    .panel.noTitle .panelTitle{ display:none; }
+
+    /* Slides */
+    .slide{
+      position:absolute;
+      opacity:0;
+      transform: translateY(4px);
+      pointer-events:none;
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+    .slide.active{
+      opacity:1;
+      transform: translateY(0);
+      pointer-events:auto;
+    }
+    .panel.hasTitle .slide{ inset: 44px 10px 10px 10px; }
+    .panel.noTitle  .slide{ inset: 10px; }
+
+    /* Totals slide header */
+    .slideHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.22 * var(--a)));
+    }
+    .slideHead .h{
+      font-family: "IM Fell English", serif;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+    .slideHead .sub{
+      font-size: 10px;
+      font-weight: 900;
+      color: rgba(45, 30, 16, 0.68);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    /* Ledger list */
+    ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+
+    li{
+      display:grid;
+      grid-template-columns: auto 1fr auto;
+      gap:10px;
+      font-size: 11px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.20 * var(--a)));
+      align-items:start;
+    }
+    li:last-child{ border-bottom:none; padding-bottom:0; }
+
+    .ago{
+      font-weight:800;
+      color: rgba(26,18,10,0.55);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      padding-top: 1px;
+    }
+
+    .desc{
+      font-weight:900;
+      letter-spacing: 0.01em;
+      overflow:hidden;
+      display:-webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+      line-height: 1.15;
+    }
+
+    .right{
+      font-weight:900;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      color: rgba(26,18,10,0.78);
+      padding-top: 1px;
+      text-align:right;
+      justify-self:end;
+    }
+    .pGood{ color: var(--good); }
+    .pBad{ color: var(--bad); }
+
+    /* RIGHT TOTALS */
+    .stats{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .stat{
+      padding: 8px 9px;
+      border-radius: 12px;
+      background: rgba(255,255,255, calc(0.26 * var(--a)));
+      border: 1px solid rgba(78,54,26, calc(0.16 * var(--a)));
+    }
+
+    .label{
+      font-size: 10px;
+      font-weight: 800;
+      color: rgba(45, 30, 16, 0.70);
+      margin-bottom: 2px;
+    }
+
+    .value{
+      font-size: 15px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    .profitGood{ color: var(--good); }
+    .profitBad{ color: var(--bad); }
+
+    /* Status popups */
+    .alerts{
+      position: fixed;
+      right: 24px;
+      top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .statusPopup{
+      position: relative;
+      min-width: 260px;
+      max-width: 360px;
+      padding: 16px 16px 14px;
+      border-radius: 14px;
+      background:
+        radial-gradient(240px 180px at 22% 10%, rgba(255,255,255,0.24), transparent 64%),
+        linear-gradient(135deg, rgba(230,214,180,0.92), rgba(211,187,142,0.96));
+      color: var(--ink);
+      box-shadow:
+        0 18px 46px rgba(0,0,0,0.32),
+        0 0 0 1px rgba(78,54,26,0.22),
+        inset 0 0 0 1px rgba(255,255,255,0.30);
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      line-height: 1.25;
+      opacity: 0;
+      transform: translateY(-10px) scale(0.96) rotate(-0.5deg);
+      transition: opacity 220ms ease, transform 220ms ease;
+      pointer-events: auto;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .statusPopup::before,
+    .statusPopup::after{
+      content:"";
+      position:absolute;
+      width:14px; height:14px;
+      border-radius:50%;
+      background: radial-gradient(circle at 30% 30%, #fff 0%, #caa567 45%, #8d6430 72%);
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.25),
+        inset 0 0 0 1px rgba(0,0,0,0.15);
+      top: 10px;
+    }
+    .statusPopup::before{ left: 12px; }
+    .statusPopup::after{ right: 12px; }
+    .statusPopup.show{
+      opacity: 1;
+      transform: translateY(0) scale(1) rotate(0deg);
+      animation: thump 620ms cubic-bezier(0.22, 0.95, 0.54, 1.35);
+    }
+    .statusPopup.good{
+      background:
+        radial-gradient(260px 200px at 20% 10%, rgba(255,255,255,0.32), transparent 66%),
+        linear-gradient(135deg, rgba(216,246,218,0.95), rgba(188,226,195,0.96));
+      box-shadow:
+        0 18px 46px rgba(0,0,0,0.32),
+        0 0 0 1px rgba(20,118,62,0.24),
+        inset 0 0 0 1px rgba(255,255,255,0.36);
+    }
+    .statusPopup.bad{
+      background:
+        radial-gradient(260px 200px at 20% 10%, rgba(255,255,255,0.32), transparent 66%),
+        linear-gradient(135deg, rgba(255,222,214,0.95), rgba(238,186,180,0.96));
+      box-shadow:
+        0 18px 46px rgba(0,0,0,0.32),
+        0 0 0 1px rgba(165,40,34,0.26),
+        inset 0 0 0 1px rgba(255,255,255,0.36);
+    }
+    .statusBanner{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom: 8px;
+    }
+    .statusStamp{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding: 4px 9px 3px;
+      border-radius: 999px;
+      background: rgba(78,54,26,0.08);
+      border: 1px solid rgba(78,54,26,0.18);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(45,30,16,0.80);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    .statusStamp.good{
+      background: rgba(20,118,62,0.10);
+      border-color: rgba(20,118,62,0.30);
+      color: rgba(20,118,62,0.90);
+    }
+    .statusStamp.bad{
+      background: rgba(165,40,34,0.10);
+      border-color: rgba(165,40,34,0.30);
+      color: rgba(165,40,34,0.92);
+    }
+    .statusRibbon{
+      padding: 2px 8px;
+      background: linear-gradient(90deg, rgba(200,168,92,0.22), rgba(200,168,92,0.45));
+      color: rgba(45,30,16,0.78);
+      font-size: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(200,168,92,0.40);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.40);
+    }
+    .statusItem{
+      font-family: "IM Fell English", serif;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+      line-height: 1.2;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.22);
+    }
+    .statusMeta{
+      font-size: 13px;
+      font-weight: 900;
+      color: rgba(26,18,10,0.82);
+      margin-bottom: 4px;
+    }
+    .statusMeta strong{ color: var(--good); }
+    .statusMeta.bad strong{ color: var(--bad); }
+    .statusProfit{
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.01em;
+      color: var(--good);
+      margin-bottom: 2px;
+    }
+    .statusProfit.bad{ color: var(--bad); }
+    .statusFooter{
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: rgba(45,30,16,0.62);
+      text-transform: uppercase;
+    }
+    @keyframes thump{
+      0%   { transform: translateY(-14px) scale(0.92) rotate(-1deg); opacity:0; }
+      58%  { transform: translateY(0) scale(1.03) rotate(0.6deg); }
+      100% { transform: translateY(0) scale(1) rotate(0deg); opacity:1; }
+    }
+    /* STOCK SLIDE */
+    .stockCard{
+      border-radius: 14px;
+      border: 1px solid rgba(78,54,26, calc(0.18 * var(--a)));
+      background:
+        radial-gradient(520px 240px at 18% 12%, rgba(255,255,255, calc(0.20 * var(--a))), transparent 66%),
+        linear-gradient(180deg, rgba(255,255,255, calc(0.18 * var(--a))), rgba(0,0,0, calc(0.04 * var(--a))));
+      padding: 12px 12px 10px;
+      height: 100%;
+      box-sizing: border-box;
+    }
+
+    .stockHero{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items:end;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.26 * var(--a)));
+    }
+
+    .stockHeroTitle{
+      font-family: "IM Fell English", serif;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+      line-height: 1;
+    }
+
+    .stockHeroRight{
+      text-align:right;
+    }
+
+    .stockHeroLabel{
+      font-size: 10px;
+      font-weight: 900;
+      color: rgba(45, 30, 16, 0.68);
+      letter-spacing: 0.02em;
+      margin-bottom: 2px;
+      white-space: nowrap;
+    }
+
+    .stockHeroValue{
+      font-size: 24px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .stockTableHead{
+      display:grid;
+      grid-template-columns: 1.7fr 1fr;
+      gap: 12px;
+      font-size: 10px;
+      font-weight: 900;
+      color: rgba(45, 30, 16, 0.68);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0 2px 6px;
+    }
+
+    .stockRowsWrap{
+      position:relative;
+      height: 110px;
+      overflow:hidden;
+      border-radius: 10px;
+      border: 1px solid rgba(78,54,26, calc(0.12 * var(--a)));
+      background: rgba(255,255,255, calc(0.18 * var(--a)));
+      padding: 8px 8px;
+    }
+
+    .stockRowsInner{ will-change: transform; }
+    .scrolling .stockRowsInner{
+      animation: vscroll var(--dur, 18s) linear infinite;
+    }
+    @keyframes vscroll{
+      0%   { transform: translateY(0); }
+      100% { transform: translateY(calc(-1 * var(--travel, 0px))); }
+    }
+
+    .stockRow{
+      display:grid;
+      grid-template-columns: 1.7fr 1fr;
+      gap: 12px;
+      align-items: baseline;
+      font-size: 11px;
+      padding: 7px 2px;
+      border-bottom: 1px dashed rgba(78,54,26, calc(0.18 * var(--a)));
+    }
+    .stockRow:last-child{ border-bottom:none; }
+
+    .stockItem{
+      font-weight: 900;
+      overflow:hidden;
+      display:-webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+      line-height: 1.15;
+    }
+    .stockPaid{
+      font-weight: 900;
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      color: rgba(26,18,10,0.78);
+    }
+
+  </style>
+</head>
+
+<body>
+<div class="stage">
+  <div class="hud">
+    <div class="board">
+      <div class="wrap">
+        <div class="topStrip">
+          <div class="header">
+            <div class="title">Caravan Trade History</div>
+            <div class="metaRight">
+              <div class="stampTime" id="updatedAt">--</div>
+              <div class="live"><span class="dot" id="dot"></span><span id="statusText">Live</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid" id="grid">
+
+          <!-- LEFT: slides -->
+          <div class="panel hasTitle" id="panel">
+            <div class="panelTitle" id="panelTitle">
+              <h3 id="panelHeading">Recent Trades</h3>
+              <span style="font-size:10px;color:rgba(45,30,16,0.55);font-weight:900;letter-spacing:0.02em;">Ledger</span>
+            </div>
+
+            <!-- Totals (ledger) -->
+            <div class="slide active" id="slideTotals">
+              <div class="slideHead">
+                <div class="h">Caravan Log</div>
+                <div class="sub">Last 8 entries</div>
+              </div>
+              <ul id="ledger"></ul>
+            </div>
+
+            <!-- Stock -->
+            <div class="slide" id="slideStock">
+              <div class="stockCard">
+                <div class="stockHero">
+                  <div class="stockHeroTitle">Current Stock</div>
+                  <div class="stockHeroRight">
+                    <div class="stockHeroLabel">Current Stock Value</div>
+                    <div class="stockHeroValue" id="stockValueBig">--</div>
+                  </div>
+                </div>
+
+                <div class="stockTableHead">
+                  <div>Item Bought For</div>
+                  <div>Total Paid</div>
+                </div>
+
+                <div class="stockRowsWrap" id="stockRowsWrap">
+                  <div class="stockRowsInner" id="stockRowsInner">
+                    <div id="stockRows"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT: totals -->
+          <div class="stats" id="stats">
+            <div class="stat">
+              <div class="label">Total Cash</div>
+              <div class="value" id="cash">--</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total Stock Value</div>
+              <div class="value" id="stockValue">--</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total Profit</div>
+              <div class="value" id="profit">--</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="alerts" id="alerts" aria-live="polite"></div>
+
+<script>
+  const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycby-fsRS9JFWzeGCnYuQw4TvbODGEqngsfDioSTqNqLun5l7Un_ZhCSHShJDzYn0-kTd/exec";
+  const REFRESH_MS = 3000;
+
+  const seenEvents = new Set();
+  let popupInit = false;
+  function jsonp(url, params = {}) {
+    return new Promise((resolve, reject) => {
+      const cbName = "cb_" + Math.random().toString(36).slice(2);
+      const script = document.createElement("script");
+      params.callback = cbName;
+      params._ = Date.now() + "-" + Math.random().toString(36).slice(2);
+
+      const qs = Object.entries(params)
+        .map(([k,v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v))
+        .join("&");
+
+      const fullUrl = url + (url.includes("?") ? "&" : "?") + qs;
+
+      const timeout = setTimeout(() => { cleanup(); reject(new Error("JSONP timeout")); }, 8000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        if (script.parentNode) script.parentNode.removeChild(script);
+        delete window[cbName];
+      }
+
+      window[cbName] = (data) => { cleanup(); resolve(data); };
+      script.onerror = () => { cleanup(); reject(new Error("JSONP load error")); };
+      script.src = fullUrl;
+      document.head.appendChild(script);
+    });
+  }
+
+  function money(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return "--";
+    return "$" + num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+
+  function signedMoney(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return "--";
+    const sign = num >= 0 ? "+" : "-";
+    return sign + "$" + Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+
+  function titleCase(s) {
+    return String(s || "")
+      .toLowerCase()
+      .split(" ")
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function makeEventKey(ev) {
+    if (!ev) return "";
+    return [
+      ev.id || "",
+      ev.type || "",
+      ev.timestamp || "",
+      ev.amount || "",
+      ev.profit || ""
+    ].join("|");
+  }
+
+  function normType(t) {
+    return String(t || "").trim().toLowerCase();
+  }
+
+  function isSold(ev) {
+    return normType(ev && ev.type) === "sold";
+  }
+
+  function isBought(ev) {
+    const t = normType(ev && ev.type);
+    return t === "bought" || t === "buy" || t === "in";
+  }
+
+  function showStatusPopup({ itemName, amountValue, kind, profitValue }) {
+    const wrap = document.getElementById("alerts");
+    if (!wrap) return;
+
+    const el = document.createElement("div");
+    const itemText = escapeHtml(String(itemName || "--").toUpperCase());
+
+    if (kind === "buy") {
+      el.className = "statusPopup";
+      el.innerHTML = `
+        <div class="statusBanner">
+          <span class="statusStamp">PRODUCT ACQUIRED</span>
+          <span class="statusRibbon">Fresh stock</span>
+        </div>
+        <div class="statusItem">${itemText}</div>
+        <div class="statusMeta">We bought it for <strong>${escapeHtml(money(amountValue))}</strong></div>
+        <div class="statusFooter">Stash it with the caravan</div>
+      `;
+    } else if (kind === "sell") {
+      const p = Number(profitValue);
+      const good = isFinite(p) ? p >= 0 : true;
+      el.className = `statusPopup ${good ? "good" : "bad"}`;
+      el.innerHTML = `
+        <div class="statusBanner">
+          <span class="statusStamp ${good ? "good" : "bad"}">PRODUCT SOLD!</span>
+          <span class="statusRibbon">${good ? "Boom! We got a sale" : "We sold it off"}</span>
+        </div>
+        <div class="statusItem">${itemText}</div>
+        <div class="statusMeta ${good ? "" : "bad"}">We sold it for <strong>${escapeHtml(money(amountValue))}</strong></div>
+        <div class="statusProfit ${good ? "" : "bad"}">${escapeHtml(signedMoney(p))} profit</div>
+        <div class="statusFooter">Let's gooooo!</div>
+      `;
+    }
+
+    wrap.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("show"));
+    playChime(kind);
+
+    setTimeout(() => {
+      el.classList.remove("show");
+      setTimeout(() => el.remove(), 220);
+    }, 2600);
+  }
+
+  /* Audio cues (royalty-free; multiple fallbacks) */
+  function makeSoundPlayer(srcs, volume = 0.75) {
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.volume = volume;
+    let idx = 0;
+
+    function setSrc(i) {
+      if (i >= srcs.length) return;
+      audio.src = srcs[i];
+      audio.load();
+    }
+
+    audio.onerror = () => {
+      idx += 1;
+      setSrc(idx);
+    };
+
+    setSrc(0);
+
+    return {
+      play(fallback) {
+        try {
+          audio.currentTime = 0;
+          const p = audio.play();
+          if (p && typeof p.catch === "function") {
+            p.catch(() => fallback && fallback());
+          }
+        } catch (e) {
+          if (fallback) fallback();
+        }
+      }
+    };
+  }
+
+  // Sources: Google Actions library + Pixabay direct file paths (royalty-free)
+  const buyPlayer = makeSoundPlayer([
+    "https://actions.google.com/sounds/v1/foley/coins_spilling.ogg",
+    "https://cdn.pixabay.com/audio/2022/03/15/audio_0c7084e375.mp3", // coins clink
+    "https://cdn.pixabay.com/audio/2022/10/16/audio_d3b9205a8a.mp3"  // coin drop
+  ], 0.65);
+
+  const sellPlayer = makeSoundPlayer([
+    "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg",
+    "https://cdn.pixabay.com/audio/2022/03/09/audio_21d5c71a62.mp3", // register chime
+    "https://cdn.pixabay.com/audio/2022/03/09/audio_36f79b68bd.mp3"  // short ka-ching
+  ], 0.8);
+
+  // Tiny synthetic chime fallback if all sources fail/autoplay blocked
+  function beepFallback(kind) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "triangle";
+      const now = ctx.currentTime;
+      if (kind === "sell") {
+        o.frequency.setValueAtTime(520, now);
+        o.frequency.exponentialRampToValueAtTime(900, now + 0.25);
+      } else {
+        o.frequency.setValueAtTime(320, now);
+        o.frequency.exponentialRampToValueAtTime(560, now + 0.25);
+      }
+      g.gain.setValueAtTime(0.18, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      o.connect(g).connect(ctx.destination);
+      o.start(now);
+      o.stop(now + 0.5);
+    } catch (e) { /* ignore */ }
+  }
+
+  function playChime(kind) {
+    if (kind === "sell") {
+      sellPlayer.play(() => beepFallback(kind));
+    } else {
+      buyPlayer.play(() => beepFallback(kind));
+    }
+  }
+
+function setPanelOpacity(opacity1to100) {
+  const n = Number(opacity1to100);
+  const pct = isFinite(n) ? Math.max(1, Math.min(100, n)) : 100;
+
+  // visual textures still use --a
+  document.documentElement.style.setProperty("--a", (pct / 100).toFixed(2));
+
+  // EVERYTHING (including text) fades together
+  document.querySelector(".hud").style.opacity = (pct / 100).toFixed(2);
+}
+
+  function setLive(ok) {
+    document.getElementById("statusText").textContent = ok ? "Live" : "Offline";
+    document.getElementById("dot").style.opacity = ok ? "1" : "0.25";
+  }
+
+  function minutesAgo(iso) {
+    if (!iso) return "--";
+    const t = Date.parse(iso);
+    if (!isFinite(t)) return "--";
+    const diffMs = Date.now() - t;
+    const mins = Math.max(0, Math.floor(diffMs / 60000));
+    if (mins < 1) return "now";
+    if (mins === 1) return "1m";
+    if (mins < 60) return mins + "m";
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+  }
+
+  function renderLedger(el, items) {
+    el.innerHTML = "";
+    if (!items || !items.length) {
+      el.innerHTML = `<li><span class="ago">--</span><span class="desc">No trades yet</span><span class="right"></span></li>`;
+      return;
+    }
+
+    items.forEach(ev => {
+      const ago = minutesAgo(ev.timestamp);
+      const item = titleCase(ev.item);
+      const t = normType(ev && ev.type);
+
+      if (isBought(ev)) {
+        el.innerHTML += `
+          <li>
+            <span class="ago">${escapeHtml(ago)}</span>
+            <span class="desc">${escapeHtml(`Bought: ${item}`)}</span>
+            <span class="right">${escapeHtml(money(ev.amount))}</span>
+          </li>`;
+        return;
+      }
+
+      if (isSold(ev)) {
+        const sale = money(ev.amount);
+        const p = Number(ev.profit);
+        const pText = signedMoney(p);
+        const cls = isFinite(p) && p < 0 ? "pBad" : "pGood";
+
+        el.innerHTML += `
+          <li>
+            <span class="ago">${escapeHtml(ago)}</span>
+            <span class="desc">${escapeHtml(`Sold: ${item}`)}</span>
+            <span class="right">${escapeHtml(sale)} <span class="${cls}">(${escapeHtml(pText)})</span></span>
+          </li>`;
+        return;
+      }
+
+      // Unknown type: show raw label for debugging
+      el.innerHTML += `
+        <li>
+          <span class="ago">${escapeHtml(ago)}</span>
+          <span class="desc">${escapeHtml(`${t || "Unknown"}: ${item}`)}</span>
+          <span class="right">${escapeHtml(money(ev.amount))}</span>
+        </li>`;
+    });
+  }
+
+  function renderStockRows(el, items) {
+    el.innerHTML = "";
+    if (!items || !items.length) {
+      el.innerHTML = `<div class="stockRow"><div class="stockItem">No stock held</div><div class="stockPaid">--</div></div>`;
+      return;
+    }
+
+    items.forEach(s => {
+      const item = titleCase(s.item);
+      const total = money(s.totalBuy);
+
+      el.innerHTML += `
+        <div class="stockRow">
+          <div class="stockItem">${escapeHtml(item)}</div>
+          <div class="stockPaid">${escapeHtml(total)}</div>
+        </div>`;
+    });
+  }
+
+  function setSlide(slide, hasStock) {
+    const grid = document.getElementById("grid");
+    const panel = document.getElementById("panel");
+    const panelTitle = document.getElementById("panelTitle");
+
+    const totals = document.getElementById("slideTotals");
+    const stock = document.getElementById("slideStock");
+
+    const desired = (slide === "Stock" && hasStock) ? "Stock" : "Totals";
+
+    if (desired === "Stock") {
+      grid.classList.add("stockMode");
+      panel.classList.remove("hasTitle");
+      panel.classList.add("noTitle");
+      if (panelTitle) panelTitle.style.display = "none";
+
+      totals.classList.remove("active");
+      stock.classList.add("active");
+    } else {
+      grid.classList.remove("stockMode");
+      panel.classList.remove("noTitle");
+      panel.classList.add("hasTitle");
+      if (panelTitle) panelTitle.style.display = "";
+
+      stock.classList.remove("active");
+      totals.classList.add("active");
+    }
+  }
+
+  function updateStockScrolling() {
+    const wrap = document.getElementById("stockRowsWrap");
+    const inner = document.getElementById("stockRowsInner");
+
+    wrap.classList.remove("scrolling");
+    document.documentElement.style.setProperty("--travel", "0px");
+    document.documentElement.style.setProperty("--dur", "18s");
+
+    requestAnimationFrame(() => {
+      const wrapH = wrap.clientHeight;
+      const innerH = inner.scrollHeight;
+
+      if (innerH > wrapH + 6) {
+        const travel = innerH - wrapH;
+        const dur = Math.max(16, Math.min(48, Math.round(travel / 9)));
+
+        document.documentElement.style.setProperty("--travel", travel + "px");
+        document.documentElement.style.setProperty("--dur", dur + "s");
+        wrap.classList.add("scrolling");
+      }
+    });
+  }
+
+  async function tick() {
+    try {
+      const data = await jsonp(ENDPOINT_URL);
+
+      // Stats
+      document.getElementById("cash").textContent = money(data.cash);
+      document.getElementById("stockValue").textContent = money(data.stockValue);
+      document.getElementById("stockValueBig").textContent = money(data.stockValue);
+
+      const profitEl = document.getElementById("profit");
+      const p = Number(data.profit);
+      if (isFinite(p)) {
+        profitEl.textContent = signedMoney(p);
+        profitEl.classList.toggle("profitGood", p >= 0);
+        profitEl.classList.toggle("profitBad", p < 0);
+      } else {
+        profitEl.textContent = "--";
+        profitEl.classList.remove("profitGood", "profitBad");
+      }
+
+      setPanelOpacity(data.opacity);
+
+      const updated = data.updatedAt ? new Date(data.updatedAt) : null;
+      document.getElementById("updatedAt").textContent =
+        updated && !isNaN(updated)
+          ? updated.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          : "--";
+
+      // Slide
+      const serverSlide = String(data.slide || "Totals");
+      const hasStock = Array.isArray(data.stockItems) && data.stockItems.length > 0;
+      setSlide(serverSlide, hasStock);
+
+      // Content
+      const ledgerData = (data.ledger || []).slice(0, 8);
+      renderLedger(document.getElementById("ledger"), ledgerData);
+      renderStockRows(document.getElementById("stockRows"), data.stockItems);
+      updateStockScrolling();
+
+      // Detect new buys/sells and pop a message
+      if (!popupInit) {
+        ledgerData.forEach(ev => {
+          const key = makeEventKey(ev);
+          if (key) seenEvents.add(key);
+        });
+        popupInit = true;
+      } else {
+        ledgerData.forEach(ev => {
+          const key = makeEventKey(ev);
+          if (!key || seenEvents.has(key)) return;
+          seenEvents.add(key);
+          if (isBought(ev)) {
+            showStatusPopup({ kind: "buy", itemName: ev.item, amountValue: ev.amount });
+          } else if (isSold(ev)) {
+            showStatusPopup({ kind: "sell", itemName: ev.item, amountValue: ev.amount, profitValue: ev.profit });
+          }
+        });
+      }
+
+      setLive(true);
+    } catch (e) {
+      setLive(false);
+    }
+  }
+
+  tick();
+  setInterval(tick, REFRESH_MS);
+</script>
+</body>
+</html>
+
+
+
+
+
