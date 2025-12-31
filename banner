@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caravan Trade Ticker</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Inter:wght@600;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --dur: 24s;
+      --op: 1;
+      --ink: rgba(255,242,210,0.92);
+      --bgTop: rgba(52, 38, 20, 0.82);
+      --bgBot: rgba(34, 24, 12, 0.86);
+      --gold: rgba(200,168,92,0.75);
+      --good: #9cf2b2;
+      --bad: #f7b0a7;
+    }
+
+    html, body{
+      margin:0;
+      padding:0;
+      background:transparent;
+      overflow:hidden;
+    }
+
+    .banner{
+      width: 2000px;
+      box-sizing: border-box;
+      padding: 6px 12px 8px;
+      background: linear-gradient(180deg, var(--bgTop), var(--bgBot));
+      border: 1px solid rgba(200,168,92,0.38);
+      box-shadow:
+        0 14px 36px rgba(0,0,0,0.45),
+        inset 0 1px 0 rgba(255,255,255,0.22);
+      color: var(--ink);
+      font-family: "IM Fell English", serif;
+      letter-spacing: 0.02em;
+      opacity: var(--op);
+    }
+
+    .tickerWrap{
+      position: relative;
+      height: 30px;
+      overflow: hidden;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(200,168,92,0.35);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.24),
+        0 6px 16px rgba(0,0,0,0.35);
+    }
+    .tickerInner{
+      position:absolute;
+      inset: 0;
+      display:flex;
+      align-items:center;
+      white-space: nowrap;
+      font-family: Inter, system-ui, sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      overflow:hidden;
+    }
+    .tickerTrack{
+      display:flex;
+      align-items:center;
+      gap: 22px;
+      padding: 0 18px;
+      flex-shrink: 0;
+      animation: ticker var(--dur) linear infinite;
+    }
+    .tickerItem{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(200,168,92,0.38);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.20),
+        0 2px 10px rgba(0,0,0,0.35);
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width: 32px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(200,168,92,0.24);
+      border: 1px solid rgba(200,168,92,0.55);
+      color: var(--ink);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge.good{
+      background: rgba(20,118,62,0.24);
+      border-color: rgba(20,118,62,0.65);
+      color: #dff8e5;
+    }
+    .badge.bad{
+      background: rgba(165,40,34,0.24);
+      border-color: rgba(165,40,34,0.65);
+      color: #ffe1dc;
+    }
+    .desc{
+      color: var(--ink);
+      font-weight: 900;
+    }
+    .money{
+      color: var(--ink);
+      font-weight: 900;
+    }
+    .money.good{ color: var(--good); }
+    .money.bad{ color: var(--bad); }
+    @keyframes ticker{
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="banner">
+    <div class="tickerWrap" aria-live="polite">
+      <div class="tickerInner">
+        <div class="tickerTrack" id="tickerTrack"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycby-fsRS9JFWzeGCnYuQw4TvbODGEqngsfDioSTqNqLun5l7Un_ZhCSHShJDzYn0-kTd/exec";
+    const REFRESH_MS = 4000;
+
+    function jsonp(url, params = {}) {
+      return new Promise((resolve, reject) => {
+        const cbName = "cb_" + Math.random().toString(36).slice(2);
+        const script = document.createElement("script");
+        params.callback = cbName;
+        params._ = Date.now() + "-" + Math.random().toString(36).slice(2);
+
+        const qs = Object.entries(params).map(([k,v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v)).join("&");
+        const fullUrl = url + (url.includes("?") ? "&" : "?") + qs;
+
+        const timeout = setTimeout(() => { cleanup(); reject(new Error("JSONP timeout")); }, 8000);
+        function cleanup() {
+          clearTimeout(timeout);
+          if (script.parentNode) script.parentNode.removeChild(script);
+          delete window[cbName];
+        }
+        window[cbName] = (data) => { cleanup(); resolve(data); };
+        script.onerror = () => { cleanup(); reject(new Error("JSONP load error")); };
+        script.src = fullUrl;
+        document.head.appendChild(script);
+      });
+    }
+
+    function money(n) {
+      const num = Number(n);
+      if (!isFinite(num)) return "--";
+      return "$" + num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+    function signedMoney(n) {
+      const num = Number(n);
+      if (!isFinite(num)) return "";
+      const sign = num >= 0 ? "+" : "-";
+      return sign + "$" + Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+    function titleCase(s) {
+      return String(s || "")
+        .toLowerCase()
+        .split(" ")
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    }
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+    function normType(t) {
+      return String(t || "").trim().toLowerCase();
+    }
+    function isSold(ev) { return normType(ev && ev.type) === "sold"; }
+    function isBought(ev) {
+      const t = normType(ev && ev.type);
+      return t === "bought" || t === "buy" || t === "in";
+    }
+    function setTickerOpacity(opacity1to100) {
+      const n = Number(opacity1to100);
+      const pct = isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
+      document.documentElement.style.setProperty("--op", (pct / 100).toFixed(2));
+    }
+
+    let lastSig = "";
+    let lastRender = 0;
+    function renderTicker(items) {
+      const track = document.getElementById("tickerTrack");
+      if (!track) return;
+
+      const hasItems = Array.isArray(items) && items.length > 0;
+      const baseItems = hasItems ? items.slice(0, 10) : [{ type:"", item:"Awaiting trades", amount:"", profit:"" }];
+
+      // Build a signature to avoid unnecessary DOM resets (prevents animation jumps)
+      const sig = JSON.stringify(baseItems.map(i => [i.type, i.item, i.amount, i.profit]));
+      const now = Date.now();
+      if (sig === lastSig && now - lastRender < 12000) return;
+      lastSig = sig;
+      lastRender = now;
+
+      const htmlItem = (ev) => {
+        const label = isSold(ev) ? "Sold" : isBought(ev) ? "Bought" : (ev.type || "Log");
+        const badgeCls = isSold(ev) ? "good" : isBought(ev) ? "" : "bad";
+        const amt = money(ev.amount);
+        const desc = titleCase(ev.item);
+        const p = Number(ev.profit);
+        const profitTxt = isSold(ev) && isFinite(p) ? signedMoney(p) : "";
+        const profitCls = isFinite(p) && p < 0 ? "bad" : "good";
+        const profitHtml = profitTxt ? `<span class="money ${profitCls}">${escapeHtml(profitTxt)}</span>` : "";
+
+        return `
+          <div class="tickerItem">
+            <span class="badge ${badgeCls}">${escapeHtml(label)}</span>
+            <span class="desc">${escapeHtml(desc)}</span>
+            ${amt ? `<span class="money ${isSold(ev) ? "good" : ""}">${escapeHtml(amt)}</span>` : ""}
+            ${profitHtml}
+          </div>`;
+      };
+
+      // Ensure the track is always filled: repeat the set until it comfortably exceeds the viewport, then double it
+      const repeats = [];
+      const targetCount = Math.max(10, baseItems.length * 3);
+      while (repeats.length < targetCount) {
+        repeats.push(...baseItems);
+      }
+      const limited = repeats.slice(0, targetCount);
+      const nodes = limited.map(htmlItem).join("");
+
+      // Double the content for a seamless -50% loop
+      track.innerHTML = nodes + nodes;
+
+      const textLen = (track.textContent || "").length;
+      const dur = Math.max(22, Math.min(60, Math.round((textLen / 8))));
+      document.documentElement.style.setProperty("--dur", dur + "s");
+    }
+
+    async function tick() {
+      try {
+        const data = await jsonp(ENDPOINT_URL);
+        const maxItems = 10;
+        const ledgerData = (data.ledger || []).slice(0, maxItems);
+        setTickerOpacity(data.opacity);
+        renderTicker(ledgerData);
+      } catch (e) {
+        /* silently ignore so stream overlay keeps running */
+      }
+    }
+
+    tick();
+    setInterval(tick, REFRESH_MS);
+  </script>
+</body>
+</html>
